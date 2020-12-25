@@ -25,7 +25,7 @@ We used HyperDrive for hyperparameter tuning with RandomParameterSampling as our
 We declare a search space for four (4) hyperparemeters such as solver and regularization penalty. Our primary metric was AUC_weighted.
 Using area-under-the-curve (AUC) vs. accuracy is a more balanced approach for datasets with imbalanced classes for prediction.
 This is evident in the other experiment we ran with AutoML (see image below on 'Data guardrails'). A classification algorithm might have a high accuracy but it may be due to bias towards the majority class while the minority class considered as noise.
-![imblance image](images/imbalance.png)
+![imbalance image](images/imbalance.PNG)
 
 The entire experiment pipeline in Azure was executed in a jupyter notebook though the functions were declared in a python script and passed as modules in the .ipynb file.
 
