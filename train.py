@@ -2,7 +2,7 @@ from sklearn.linear_model import LogisticRegression
 import argparse
 import os
 import numpy as np
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, roc_auc_score, confusion_matrix
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
@@ -14,15 +14,6 @@ from azureml.data.dataset_factory import TabularDatasetFactory
 # Data is located at:
 # "https://automlsamplenotebookdata.blob.core.windows.net/automl-sample-notebook-data/bankmarketing_train.csv"
 
-ds = ### YOUR CODE HERE ###
-
-x, y = clean_data(ds)
-
-# TODO: Split data into train and test sets.
-
-### YOUR CODE HERE ###a
-
-run = Run.get_context()
 
 def clean_data(data):
     # Dict for cleaning data
@@ -49,24 +40,52 @@ def clean_data(data):
     x_df["poutcome"] = x_df.poutcome.apply(lambda s: 1 if s == "success" else 0)
 
     y_df = x_df.pop("y").apply(lambda s: 1 if s == "yes" else 0)
-    
+    return x_df, y_df 
 
-def main():
+def main():     
     # Add arguments to script
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--C', type=float, default=1.0, help="Inverse of regularization strength. Smaller values cause stronger regularization")
     parser.add_argument('--max_iter', type=int, default=100, help="Maximum number of iterations to converge")
+    parser.add_argument('--solver', type=str, default='lbfgs', help="Algorithm to use in the optimization problem")
+    parser.add_argument('--penalty', type=str, default='l2', help="Used to specify the norm used in the penalization")
 
     args = parser.parse_args()
 
+    run = Run.get_context()
+
     run.log("Regularization Strength:", np.float(args.C))
     run.log("Max iterations:", np.int(args.max_iter))
+    run.log("Penalty:", args.penalty)
+    run.log("Solver for optimization:", args.solver)
 
-    model = LogisticRegression(C=args.C, max_iter=args.max_iter).fit(x_train, y_train)
+    from azureml.core import Dataset
+    dataUrl = 'https://automlsamplenotebookdata.blob.core.windows.net/automl-sample-notebook-data/bankmarketing_train.csv'
+    
+    ds = Dataset.Tabular.from_delimited_files(path = dataUrl)
 
+    x, y = clean_data(ds)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=123)
+
+    model = LogisticRegression(C=args.C, max_iter=args.max_iter, penalty=args.penalty, solver=args.solver).fit(x_train, y_train)
+
+    # save model
+    os.makedirs('./outputs', exist_ok=True)
+    # files saved in the "outputs" folder are automatically uploaded into run history
+    joblib.dump(model, './outputs/model.joblib')
+      
     accuracy = model.score(x_test, y_test)
-    run.log("Accuracy", np.float(accuracy))
+    run.log("Accuracy", np.float(accuracy)) #source: https://bit.ly/3mTxEWR && https://bit.ly/3hgonXx
+  
+    y_pred = model.predict(x_test)
+    auc_weighted = roc_auc_score(y_pred, y_test, average='weighted')
+    run.log("AUC_weighted", np.float(auc_weighted)) #source: https://bit.ly/3mTxEWR && https://bit.ly/3hgonXx
+    
+    # creating a confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+    print(cm)
 
+# Run main here not in any other module (e.g. ipynb) it's called
 if __name__ == '__main__':
     main()
